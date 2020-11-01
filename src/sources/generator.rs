@@ -42,7 +42,7 @@ impl OutputFormat {
         &self,
         config: &GeneratorConfig,
         shutdown: ShutdownSignal,
-        out: Pipeline
+        out: Pipeline,
     ) -> Result<(), ()> {
         match self {
             OutputFormat::RoundRobin { sequence, items } => {
@@ -57,7 +57,7 @@ async fn round_robin_generate(
     sequence: &bool,
     items: &Vec<String>,
     mut shutdown: ShutdownSignal,
-    mut out: Pipeline
+    mut out: Pipeline,
 ) -> Result<(), ()> {
     let mut batch_interval = config
         .batch_interval
@@ -111,7 +111,7 @@ impl GeneratorConfig {
             format: OutputFormat::RoundRobin {
                 items,
                 sequence: false,
-            }
+            },
         }
     }
 
