@@ -1,4 +1,4 @@
-mod fake;
+pub mod fake;
 
 #[cfg(feature = "sources-utils-http")]
 mod http;

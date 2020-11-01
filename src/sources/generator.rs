@@ -3,6 +3,7 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
+    sources::util::fake,
     Pipeline,
 };
 use futures::{
@@ -35,6 +36,7 @@ pub enum OutputFormat {
         sequence: bool,
         items: Vec<String>,
     },
+    ApacheCommon,
 }
 
 impl OutputFormat {
@@ -47,9 +49,45 @@ impl OutputFormat {
         match self {
             OutputFormat::RoundRobin { sequence, items } => {
                 round_robin_generate(config, sequence, items, shutdown, out).await
+            },
+            OutputFormat::ApacheCommon => {
+                apache_common_generate(config, shutdown, out).await
             }
         }
     }
+}
+
+async fn apache_common_generate(
+    config: &GeneratorConfig,
+    mut shutdown: ShutdownSignal,
+    mut out: Pipeline,
+) -> Result<(), ()> {
+    let mut batch_interval = config
+        .batch_interval
+        .map(|i| interval(Duration::from_secs_f64(i)));
+
+    for _ in 0..config.count {
+        if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
+            break;
+        }
+
+        if let Some(batch_interval) = &mut batch_interval {
+            batch_interval.next().await;
+        }
+
+        let log_line: String = fake::apache_common_log_line();
+
+        let events: Vec<Event> = vec![Event::from(log_line)];
+
+        let (sink, _) = out
+            .send_all(iter_ok(events))
+            .compat()
+            .await
+            .map_err(|error| error!(message="Error sending generated lines.", %error))?;
+        out = sink;
+    }
+
+    Ok(())
 }
 
 async fn round_robin_generate(
