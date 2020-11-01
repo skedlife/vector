@@ -53,18 +53,25 @@ components: sources: generator: {
 				unit:    null
 			}
 		}
-		lines: {
-			description: "The list of lines to output."
-			required:    true
-			warnings: []
-			type: array: items: type: string: examples: ["Line 1", "Line 2"]
-		}
-		sequence: {
-			common:      false
-			description: "If `true`, each output line will start with an increasing sequence number."
-			required:    false
-			warnings: []
-			type: bool: default: false
+
+		format: type: enum: {
+			round_robin: {
+				description: ""
+				lines: {
+					description: "The set of strings from which log lines are randomly chosen."
+					required: true
+					warnings: []
+					type: array: items: type: string: examples: ["Line 1", "Line 2"]
+				}
+
+				sequence: {
+					common:      false
+					description: "If `true`, each output line will start with an increasing sequence number."
+					required:    false
+					warnings: []
+					type: bool: default: false
+				}
+			}
 		}
 	}
 
