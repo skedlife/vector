@@ -210,6 +210,39 @@ pub fn emit(event: impl InternalEvent) {
     event.emit_metrics();
 }
 
+// Possible values for the "error_type" tag
+pub enum ErrorTypes {
+    FieldMissing,
+    InvalidMetric,
+    MappingFailed,
+    MatchFailed,
+    ParseFailed,
+    RenderError,
+    SerializationFailed,
+    TargetFieldExists,
+    TemplateError,
+    TypeConversionFailed,
+    ValueInvalid,
+}
+
+impl ErrorTypes {
+    fn to_str(&self) -> &str {
+        match self {
+            ErrorTypes::FieldMissing => "field_missing",
+            ErrorTypes::InvalidMetric => "invalid_metric",
+            ErrorTypes::MappingFailed => "mapping_failed",
+            ErrorTypes::MatchFailed => "match_failed",
+            ErrorTypes::ParseFailed => "parse_failed",
+            ErrorTypes::RenderError => "render_error",
+            ErrorTypes::SerializationFailed => "serialization_failed",
+            ErrorTypes::TargetFieldExists => "target_field_exists",
+            ErrorTypes::TemplateError => "template_error",
+            ErrorTypes::TypeConversionFailed => "type_conversion_failed",
+            ErrorTypes::ValueInvalid => "value_invalid",
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
