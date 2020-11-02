@@ -103,31 +103,16 @@ components: sources: apache_metrics: {
 	}
 
 	output: metrics: {
-		_endpoint: {
-			description: "The absolute path of originating file."
-			required:    true
-			examples: ["http://localhost:8080/server-status?auto"]
-		}
-		_host: {
-			description: "The hostname of the Apache HTTP server"
-			required:    true
-			examples: [_values.local_host]
-		}
 		apache_access_total: {
 			description:   "The total number of time the Apache server has been accessed."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 		apache_connections: {
 			description: "The total number of time the Apache server has been accessed."
 			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+			tags: _metrics._tags._apache_defaults & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -139,18 +124,13 @@ components: sources: apache_metrics: {
 			description:   "The current CPU of the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 		apache_cpu_seconds_total: {
 			description:   "The CPU time of various Apache processes."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+			tags: _metrics._tags._apache_defaults & {
 				type: {
 					description: "The state of the connection"
 					required:    true
@@ -162,17 +142,12 @@ components: sources: apache_metrics: {
 			description:   "The amount of time the Apache server has been running."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 		apache_scoreboard: {
 			description: "The amount of times various Apache server tasks have been run."
 			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+			tags: _metrics._tags._apache_defaults & {
 				state: {
 					description: "The connect state"
 					required:    true
@@ -184,25 +159,17 @@ components: sources: apache_metrics: {
 			description:   "The amount of bytes sent by the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 		apache_uptime_seconds_total: {
 			description: "The amount of time the Apache server has been running."
 			type:        "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 		apache_workers: {
 			description: "Apache worker statuses."
 			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+			tags: _metrics._tags._apache_defaults & {
 				state: {
 					description: "The state of the worker"
 					required:    true
@@ -213,10 +180,7 @@ components: sources: apache_metrics: {
 		apache_up: {
 			description: "If the Apache server is up or not."
 			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+			tags: _metrics._tags._apache_defaults
 		}
 	}
 
