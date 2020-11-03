@@ -23,12 +23,13 @@ pub struct GeneratorConfig {
     batch_interval: Option<f64>,
     #[serde(default = "usize::max_value")]
     count: usize,
+    #[serde(flatten)]
     format: OutputFormat,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
     #[derivative(Default)]
     RoundRobin {
@@ -40,133 +41,134 @@ pub enum OutputFormat {
     ApacheError,
 }
 
-impl OutputFormat {
-    async fn generate(
-        &self,
-        config: &GeneratorConfig,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> Result<(), ()> {
-        match self {
+struct Generator {
+    config: &'static GeneratorConfig,
+    shutdown: ShutdownSignal,
+    out: Pipeline,
+}
+
+impl Generator {
+    fn new(config: &'static GeneratorConfig, shutdown: ShutdownSignal, out: Pipeline) -> Self {
+        Self {
+            config,
+            shutdown,
+            out,
+        }
+    }
+
+    async fn generate(&self) -> Result<(), ()> {
+        match self.config.format {
             OutputFormat::RoundRobin { sequence, items } => {
-                round_robin_generate(config, sequence, items, shutdown, out).await
+                self.round_robin_generate(sequence, items).await
             }
-            OutputFormat::ApacheCommon => apache_common_generate(config, shutdown, out).await,
-            OutputFormat::ApacheError => apache_error_generate(config, shutdown, out).await,
+            OutputFormat::ApacheCommon => self.apache_common_generate().await,
+            OutputFormat::ApacheError => self.apache_error_generate().await,
         }
     }
-}
 
-async fn apache_common_generate(
-    config: &GeneratorConfig,
-    mut shutdown: ShutdownSignal,
-    mut out: Pipeline,
-) -> Result<(), ()> {
-    let mut batch_interval = config
-        .batch_interval
-        .map(|i| interval(Duration::from_secs_f64(i)));
+    async fn apache_common_generate(&self) -> Result<(), ()> {
+        let mut batch_interval = self
+            .config
+            .batch_interval
+            .map(|i| interval(Duration::from_secs_f64(i)));
 
-    for _ in 0..config.count {
-        if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-            break;
+        for _ in 0..self.config.count {
+            if matches!(futures::poll!(&mut self.shutdown), Poll::Ready(_)) {
+                break;
+            }
+
+            if let Some(batch_interval) = &mut batch_interval {
+                batch_interval.next().await;
+            }
+
+            let log_line: String = fake::apache_common_log_line();
+
+            let events: Vec<Event> = vec![Event::from(log_line)];
+
+            let (sink, _) = self
+                .out
+                .send_all(iter_ok(events))
+                .compat()
+                .await
+                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
+            self.out = sink;
         }
 
-        if let Some(batch_interval) = &mut batch_interval {
-            batch_interval.next().await;
-        }
-
-        let log_line: String = fake::apache_common_log_line();
-
-        let events: Vec<Event> = vec![Event::from(log_line)];
-
-        let (sink, _) = out
-            .send_all(iter_ok(events))
-            .compat()
-            .await
-            .map_err(|error| error!(message="Error sending generated lines.", %error))?;
-        out = sink;
+        Ok(())
     }
 
-    Ok(())
-}
+    async fn apache_error_generate(&self) -> Result<(), ()> {
+        let mut batch_interval = self
+            .config
+            .batch_interval
+            .map(|i| interval(Duration::from_secs_f64(i)));
 
-async fn apache_error_generate(
-    config: &GeneratorConfig,
-    mut shutdown: ShutdownSignal,
-    mut out: Pipeline,
-) -> Result<(), ()> {
-    let mut batch_interval = config
-        .batch_interval
-        .map(|i| interval(Duration::from_secs_f64(i)));
+        for _ in 0..self.config.count {
+            if matches!(futures::poll!(&mut self.shutdown), Poll::Ready(_)) {
+                break;
+            }
 
-    for _ in 0..config.count {
-        if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-            break;
+            if let Some(batch_interval) = &mut batch_interval {
+                batch_interval.next().await;
+            }
+
+            let log_line: String = fake::apache_error_log_line();
+
+            let events: Vec<Event> = vec![Event::from(log_line)];
+
+            let (sink, _) = self
+                .out
+                .send_all(iter_ok(events))
+                .compat()
+                .await
+                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
+            self.out = sink;
         }
 
-        if let Some(batch_interval) = &mut batch_interval {
-            batch_interval.next().await;
-        }
-
-        let log_line: String = fake::apache_error_log_line();
-
-        let events: Vec<Event> = vec![Event::from(log_line)];
-
-        let (sink, _) = out
-            .send_all(iter_ok(events))
-            .compat()
-            .await
-            .map_err(|error| error!(message="Error sending generated lines.", %error))?;
-        out = sink;
+        Ok(())
     }
 
-    Ok(())
-}
+    async fn round_robin_generate(&self, sequence: &bool, items: &Vec<String>) -> Result<(), ()> {
+        let mut batch_interval = self
+            .config
+            .batch_interval
+            .map(|i| interval(Duration::from_secs_f64(i)));
+        let mut number: usize = 0;
 
-async fn round_robin_generate(
-    config: &GeneratorConfig,
-    sequence: &bool,
-    items: &Vec<String>,
-    mut shutdown: ShutdownSignal,
-    mut out: Pipeline,
-) -> Result<(), ()> {
-    let mut batch_interval = config
-        .batch_interval
-        .map(|i| interval(Duration::from_secs_f64(i)));
-    let mut number: usize = 0;
+        for _ in 0..self.config.count {
+            if matches!(futures::poll!(&mut self.shutdown), Poll::Ready(_)) {
+                break;
+            }
 
-    for _ in 0..config.count {
-        if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-            break;
+            if let Some(batch_interval) = &mut batch_interval {
+                batch_interval.next().await;
+            }
+
+            let events = items
+                .to_vec()
+                .iter()
+                .map(|line| {
+                    emit!(GeneratorEventProcessed);
+
+                    if *sequence {
+                        number += 1;
+                        Event::from(&format!("{} {}", number, line)[..])
+                    } else {
+                        Event::from(&line[..])
+                    }
+                })
+                .collect::<Vec<Event>>();
+            let (sink, _) = self
+                .out
+                .send_all(iter_ok(events))
+                .compat()
+                .await
+                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
+            self.out = sink;
         }
 
-        if let Some(batch_interval) = &mut batch_interval {
-            batch_interval.next().await;
-        }
-
-        let events = items
-            .to_vec()
-            .iter()
-            .map(|line| {
-                emit!(GeneratorEventProcessed);
-
-                if *sequence {
-                    number += 1;
-                    Event::from(&format!("{} {}", number, line)[..])
-                } else {
-                    Event::from(&line[..])
-                }
-            })
-            .collect::<Vec<Event>>();
-        let (sink, _) = out
-            .send_all(iter_ok(events))
-            .compat()
-            .await
-            .map_err(|error| error!(message="Error sending generated lines.", %error))?;
-        out = sink;
+        Ok(())
     }
-
-    Ok(())
 }
 
 impl GeneratorConfig {
@@ -187,7 +189,7 @@ impl GeneratorConfig {
     }
 
     async fn inner(self, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
-        self.format.generate(&self, shutdown, out).await
+        Generator::new(&self, shutdown, out).generate().await
     }
 }
 
