@@ -361,3 +361,4 @@ spec:
                   name: vector-aggregator-config
                   optional: true
         # Extra volumes.
+  volumeClaimTemplates:
